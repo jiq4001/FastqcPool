@@ -1,0 +1,114 @@
+---
+title: "Homework Week 6 J.QI"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Homework answers checklist}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Homework Week 6 R-package FastqcPool--Batch Extraction and Visulization of Per-base Quality Score from FastQC.zip  
+
+###Set up a new package. (0.5 pts)  
+RStudio--File--New project--R-Package--give package name:FastqcPool  
+
+###Use the reading_in function (shown below) as your first function in the newly generated package. Describe the steps you have to take in order to make that function part of the package. (1pt)  
+In the R package project--New file--R script: put function here  
+In the R package project--New file--R doc(template:Function): give same name as the function.R, fill in the fields of "title", "description", "argument"......  
+
+###Make sure to adapt the DESCRIPTION file to note all the packages that this function depends on. (1pt)  
+include "Imports:" (dependency packages here)  
+include "Suggests:" (knitr, rmarkdown) "VignetteBuilder:" (knitr) to include vigenettes  
+
+###Load the function into your workspace and use it to extract the values of FastQC’s diagnostic “Per base sequence quality” from a single fastqc_data.txt file into an Robject. (1pt)  
+in Build panel-- choose "Install and Restart"  
+
+Each FastQC run should have produced such a file (usually stored in the zipped output folder) – it’s fine to download these files to your computer.  
+The command would go into the Rmd document that will become your vignette.  
+```{r, eval=F}
+sftp jiq4001@aristotle.med.cornell.edu << EOF
+> get /home/jiq4001/angsd/hw_wk4/ERR458495_fastqc.zip ./ERR458495_fastqc.zip
+> get /home/jiq4001/angsd/hw_wk4/ERR458495_fastqc.zip ./ERR458495_fastqc.zip
+> get /home/jiq4001/angsd/hw_wk4/ERR458500_fastqc.zip ./ERR458500_fastqc.zip
+> get /home/jiq4001/angsd/hw_wk4/ERR458502_fastqc.zip ./ERR458502_fastqc.zip
+> EOF
+```
+
+###Explain the logic of the function’s sed command (1pt)  
+```{r, eval=F}
+unzip -p ERR458493_fastqc.zip \*/fastqc_data.txt | sed -n -e "13,/>>END_MODULE/p" | grep -v '>>' 
+```
+sed is a stream editor, it put context in one input, -e indicates start and end patterns to search, -n indicates lines to output  
+
+Put that in the vignette, too. In principle, the @details section of the function’s documentation would be a good place to put it, too, but for the sake of the homework, just keep it in the vignette.  
+
+###Now go back to the function’s code and add a variable to the function that adds an additional column to the resulting data frame containing a user-specified sample name (e.g. “WT_1_ERR458493”). I.e., the function should get at least one more argument. (2pts)  
+*Read_in(input, rename=input, test = "Per base sequence quality")* takes *a string vector* of file list, *a string vector* of user rename list(default to file name), and the start *string pattern* to use in the sed -e commond.  
+
+###Use your updated function to read in the FastQC results of at least 4 fastq files that should cover 2 biological replicates and 2 technical replicates of each. Make sure to keep track of the sample name in the new Robjects you’re creating. (2pts)  
+```{r}
+input.file.list <- c("ERR458502_fastqc.zip", "ERR458500_fastqc.zip", 
+                     "ERR458493_fastqc.zip", "ERR458495_fastqc.zip")
+input.file.list <- system.file("extdata", input.file.list, package = "FastqcPool", mustWork = TRUE)
+input.file.list
+```
+
+It’s fine to use an R-appropriate version of a for-loop for this (go back to the course notes for a refresher).  
+###Combine all these data.frames into one (check out rbind(); if you've generated a list in the previous exercise, also look into thedo.call()function). Save that composite data frame as an.rdaobject (with thesave()function) giving it the same name as the name of the Robject (e.g.combined_df.rda`). (1pt)  
+
+```{r}
+# Build--Install and Restart the package
+library(FastqcPool)
+```
+```{r}
+
+rename.list <- c("SNF2_1_ERR458502", "SNF2_1_ERR458500", "WT_1_ERR458493", "WT_1_ERR458495")
+
+combined_df <- read_in(input = input.file.list, rename = rename.list)
+head(combined_df)
+colnames(combined_df)
+```
+
+###The goal is to include that combined data frame as a data object with your package.  
+Figure out where to store the .rda file within the package infrastructure. (0.5pt)  
+```{r, eval=F}
+save(combined_df, file = "../data/combined_df.RData")
+## place the saved combined_df.RData in /data directory under the package root directory 
+data(combined_df)
+## to load the dataframe
+```
+
+Document your object following the examples here. Where do you keep the documentation of the data file? (1pt)  
+Rd file of every document and data file is placed in the "man" directory under the package root directory  
+
+###How do you build your package? (1pt)  
+Build panel--check  fix errors check warnings  
+Install and Restart   
+
+###You can include the answer to this in the vignette, too, for the sake of the homework answers all being kept in one place. Make sure to set the code chunk option eval=FALSE though (why?).  
+"eval=F" so that the cold chunk wont be interpreated in rlang but text content.  
+
+###Make a ggplot2-based plot using the combined data frame. Try to mimick the basic features of the example plot below, but feel free to change the color palette, remove the grey background and other details. (2pts)  
+optional function to expand index columns  
+```{r}
+# function returns the updated dataframe 
+update.df <- idx_gen(combined_df, sep = "_", col.names = c("Sample", "Biorep", "Run"))
+head(update.df)
+```
+
+
+```{r, fig.width= 7, fig.height= 4}
+plotpool_error(update.df, panel = "Sample", col = "Run")
+```
+
+This should be part of the vignette, too.
+You will probably have to add a couple of columns to your original combined data frame
+You will get a bonus point if you (i) install the package (instead of loading it via devtools) and (ii) use the data stored in the package to make the plot
+
+```{r}
+list.files(system.file(package = 'FastqcPool'), recursive = T, full.names = T)
+```
+
